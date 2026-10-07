@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 
 // Shared-conversation links we plan to support first.
