@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { Conversation } from "@/lib/extract/claude";
 
 // Shared-conversation links we plan to support first.
 const SHARE_LINK =
@@ -11,8 +12,10 @@ export default function Home() {
   const [text, setText] = useState("");
   const [urlMsg, setUrlMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [textMsg, setTextMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<Conversation | null>(null);
 
-  function submitUrl(e: React.FormEvent) {
+    async function submitUrl(e: React.FormEvent) {
     e.preventDefault();
     const value = url.trim();
     if (!SHARE_LINK.test(value)) {
@@ -22,8 +25,26 @@ export default function Home() {
       });
       return;
     }
-    // Backend isn't connected yet.
-    setUrlMsg({ ok: true, text: "Link looks good. Processing comes next." });
+    setLoading(true);
+    setUrlMsg(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: value }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUrlMsg({ ok: false, text: data?.error?.message ?? "Something went wrong." });
+      } else {
+        setResult(data as Conversation);
+      }
+    } catch {
+      setUrlMsg({ ok: false, text: "Could not reach the server. Try again." });
+    } finally {
+      setLoading(false);
+    }
   }
 
   function submitText(e: React.FormEvent) {
@@ -72,10 +93,15 @@ export default function Home() {
               placeholder="https://chatgpt.com/share/..."
               className={inputBase}
             />
-            <button type="submit" className={button}>
-              Continue
+            <button type="submit" disabled={loading} className={`${button} disabled:opacity-60`}>
+              {loading ? "Reading..." : "Continue"}
             </button>
           </div>
+          {result && (
+            <p className="mt-3 text-sm text-[#1A1A18]">
+              Found <strong>{result.turns.length}</strong> messages in &ldquo;{result.title}&rdquo;.
+            </p>
+          )}
           {urlMsg && (
             <p className={`mt-2 text-sm ${urlMsg.ok ? "text-[#7A5678]" : "text-[#B3402F]"}`}>
               {urlMsg.text}
