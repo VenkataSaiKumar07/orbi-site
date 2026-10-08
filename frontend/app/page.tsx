@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { Conversation } from "@/lib/extract/claude";
+import { useRouter } from "next/navigation";
+import { saveConversation } from "@/lib/conversation-store";
 
 // Shared-conversation links we plan to support first.
 const SHARE_LINK =
@@ -13,7 +14,7 @@ export default function Home() {
   const [urlMsg, setUrlMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [textMsg, setTextMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Conversation | null>(null);
+  const router = useRouter();
 
     async function submitUrl(e: React.FormEvent) {
     e.preventDefault();
@@ -27,7 +28,6 @@ export default function Home() {
     }
     setLoading(true);
     setUrlMsg(null);
-    setResult(null);
     try {
       const res = await fetch("/api/extract", {
         method: "POST",
@@ -38,7 +38,14 @@ export default function Home() {
       if (!res.ok) {
         setUrlMsg({ ok: false, text: data?.error?.message ?? "Something went wrong." });
       } else {
-        setResult(data as Conversation);
+        if (saveConversation(data)) {
+       router.push("/view");
+     } else {
+        setUrlMsg({
+          ok: false,
+          text: "Your browser blocked temporary storage, so we can't open the conversation.",
+        });
+      }
       }
     } catch {
       setUrlMsg({ ok: false, text: "Could not reach the server. Try again." });
@@ -97,11 +104,6 @@ export default function Home() {
               {loading ? "Reading..." : "Continue"}
             </button>
           </div>
-          {result && (
-            <p className="mt-3 text-sm text-[#1A1A18]">
-              Found <strong>{result.turns.length}</strong> messages in &ldquo;{result.title}&rdquo;.
-            </p>
-          )}
           {urlMsg && (
             <p className={`mt-2 text-sm ${urlMsg.ok ? "text-[#7A5678]" : "text-[#B3402F]"}`}>
               {urlMsg.text}
